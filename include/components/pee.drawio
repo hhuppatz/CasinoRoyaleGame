@@ -1,0 +1,25 @@
+<mxfile host="65bd71144e">
+    <diagram id="mWfEBX_mXUElxBhqsy7J" name="Page-1">
+        <mxGraphModel dx="1019" dy="599" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="Inventory" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+                    <mxGeometry x="330" y="310" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="Item" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+                    <mxGeometry x="170" y="120" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="Item" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+                    <mxGeometry x="390" y="250" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="Item" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+                    <mxGeometry x="670" y="50" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="Inventory system: List of all inventories&lt;div&gt;Item system: List fo all items&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;inventory system checks if each inventory collides with items from&lt;/div&gt;&lt;div&gt;item system, picks up automatically (for now) and stores entity ID.&lt;/div&gt;&lt;div&gt;Item system then changes item state to inactive.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;If inventory has drop request, teleport item to inventory, activate it and set timer&lt;/div&gt;&lt;div&gt;to prevent instant pickup.&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+                    <mxGeometry x="180" y="403" width="440" height="140" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

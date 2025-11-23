@@ -1,0 +1,19 @@
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -Wall
+    - -Wextra
+  CompilationDatabase: build
+  Remove:
+    - -fno-keep-inline-dllexport
+    - -fvisibility=hidden
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+  Suppress:
+    - drv_unknown_argument
+Index:
+  Background: Build
+Completion:
+  AllScopes: true
+
