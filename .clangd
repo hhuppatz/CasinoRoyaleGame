@@ -1,17 +1,20 @@
 CompileFlags:
   Add:
     - -std=c++17
-    - -Wall
-    - -Wextra
-  CompilationDatabase: build
+    - -DSFML_STATIC
+    - -DNOMINMAX
+  CompilationDatabase: .
   Remove:
     - -fno-keep-inline-dllexport
     - -fvisibility=hidden
+    - /W3
+    - /W4
 Diagnostics:
-  UnusedIncludes: Strict
+  UnusedIncludes: None
   MissingIncludes: Strict
   Suppress:
     - drv_unknown_argument
+    - unknown-warning-option
 Index:
   Background: Build
 Completion:

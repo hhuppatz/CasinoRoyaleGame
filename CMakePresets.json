@@ -2,21 +2,17 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "default",
-      "displayName": "Default Config",
-      "description": "Default build using Visual Studio generator",
+      "name": "windows-base",
+      "hidden": true,
       "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
       }
     },
     {
-      "name": "x64-Debug",
-      "displayName": "x64 Debug",
-      "description": "x64 Debug build",
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build",
+      "name": "debug",
+      "inherits": "windows-base",
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -26,11 +22,8 @@
       }
     },
     {
-      "name": "x64-Release",
-      "displayName": "x64 Release",
-      "description": "x64 Release build",
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build",
+      "name": "release",
+      "inherits": "windows-base",
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -38,53 +31,22 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
-    },
-    {
-      "name": "ninja-debug",
-      "displayName": "Ninja Debug",
-      "description": "Debug build using Ninja (generates compile_commands.json)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
-    },
-    {
-      "name": "ninja-release",
-      "displayName": "Ninja Release",
-      "description": "Release build using Ninja (generates compile_commands.json)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
     }
   ],
   "buildPresets": [
     {
-      "name": "default",
-      "configurePreset": "default"
+      "name": "debug",
+      "configurePreset": "debug",
+      "nativeToolOptions": [
+        "/p:VcpkgEnableManifest=true"
+      ]
     },
     {
-      "name": "x64-Debug",
-      "configurePreset": "x64-Debug",
-      "configuration": "Debug"
-    },
-    {
-      "name": "x64-Release",
-      "configurePreset": "x64-Release",
-      "configuration": "Release"
-    },
-    {
-      "name": "ninja-debug",
-      "configurePreset": "ninja-debug"
-    },
-    {
-      "name": "ninja-release",
-      "configurePreset": "ninja-release"
+      "name": "release",
+      "configurePreset": "release",
+      "nativeToolOptions": [
+        "/p:VcpkgEnableManifest=true"
+      ]
     }
   ]
 }
-

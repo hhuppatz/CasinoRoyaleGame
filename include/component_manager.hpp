@@ -16,6 +16,7 @@ public:
 	template<typename T> void add_component(entity entity, T component);
 	template<typename T> void remove_component(entity entity);
 	template<typename T> T& get_component(entity entity);
+	template<typename T> bool has_component(entity entity);
 	void entity_destroyed(entity entity);
 private:
 	// Map from type string pointer to a component type
@@ -80,6 +81,13 @@ T& component_manager::get_component(entity entity)
 {
     // Get a reference to a component from the array for an entity
     return get_component_array<T>()->get_data(entity);
+}
+
+template<typename T>
+bool component_manager::has_component(entity entity)
+{
+    // Check if an entity has a component
+    return get_component_array<T>()->has_data(entity);
 }
 
 // Convenience function to get the statically casted pointer to the ComponentArray of type T.

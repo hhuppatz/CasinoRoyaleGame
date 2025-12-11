@@ -1,12 +1,9 @@
-#include <set>
-#include "entity.hpp"
+#pragma once
 
-#ifndef GAME_SYSTEM_H
-#define GAME_SYSTEM_H
+#include "../entity.hpp"
+#include <set>
 
 class game_system {
-    public:
-        std::set<entity> entities;
+public:
+  std::set<entity> entities;
 };
-
-#endif

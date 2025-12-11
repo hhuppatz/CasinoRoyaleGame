@@ -1,5 +1,4 @@
-#ifndef BASIC_RENDER_SYSTEM_H
-#define BASIC_RENDER_SYSTEM_H
+#pragma once
 
 #include "systems/game_system.hpp"
 #include <SFML/Graphics/RenderWindow.hpp>
@@ -13,5 +12,3 @@ class basic_render_system : public game_system {
     public:
     void update(sf::RenderWindow& window);
 };
-
-#endif

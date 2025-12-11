@@ -1,6 +1,49 @@
-build
-out
-.cache
-.idea
-.vs
-.vscode
+# Build directories
+build/
+out/
+_deps/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CPackConfig.cmake
+CPackSourceConfig.cmake
+install_manifest.txt
+
+# vcpkg
+vcpkg_installed/
+vcpkg-manifest-install.log
+
+# Compiled binaries
+*.exe
+*.dll
+*.pdb
+*.obj
+*.o
+*.lib
+*.a
+*.so
+*.dylib
+
+# IDE
+.cache/
+.idea/
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosearchoptions
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo

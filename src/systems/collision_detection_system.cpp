@@ -1,23 +1,25 @@
 #include "systems/collision_detection_system.hpp"
 #include "components/rigidbody.hpp"
 #include "components/transform.hpp"
+#include "components/network.hpp"
 #include "systems/jump_system.hpp"
 #include <SFML/Graphics/Rect.hpp>
 #include <algorithm>
 #include <cmath>
-
-// Helper function to check if two rectangles intersect
-// Using position and size from transform and hitbox directly
-bool rectanglesIntersect(float x1, float y1, float w1, float h1,
-                        float x2, float y2, float w2, float h2) {
-    return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
-}
+#include "help_functions.hpp"
+#include "components/entity_state.hpp"
 
 void collision_detection_system::update(jump_system& jump_system) {
     // First pass: Update hitboxes to align with current transform
+    // NOTE: We update hitboxes for ALL entities (including remote ones) because
+    // other systems (like inventory_system) need accurate hitbox positions
     for (auto& entity : entities) {
+        auto& entity_state_comp = g_conductor.get_component<entity_state>(entity);
         auto& transform_comp = g_conductor.get_component<transform>(entity);
         auto& rigidbody_comp = g_conductor.get_component<rigidbody>(entity);
+        if (!entity_state_comp.is_active || !rigidbody_comp.can_collide) {
+            continue;
+        }
 
         // Sync hitbox with transform: position and scale
         rigidbody_comp.Hitbox.setPosition({transform_comp.position[0], transform_comp.position[1]});
@@ -33,6 +35,18 @@ void collision_detection_system::update(jump_system& jump_system) {
         auto& entity1 = *it1;
         auto& transform1 = g_conductor.get_component<transform>(entity1);
         auto& rigidbody1 = g_conductor.get_component<rigidbody>(entity1);
+        auto& entity_state_comp1 = g_conductor.get_component<entity_state>(entity1);
+        if (!entity_state_comp1.is_active || !rigidbody1.can_collide) {
+            continue;
+        }
+        
+        // Only apply collision to LOCAL entities (not remote networked entities)
+        if (g_conductor.has_component<network>(entity1)) {
+            auto& network_comp = g_conductor.get_component<network>(entity1);
+            if (!network_comp.is_local) {
+                continue; // Skip remote entities
+            }
+        }
 
         // Check if entity1 has moved
         float lastX1 = transform1.last_position[0];
@@ -49,6 +63,10 @@ void collision_detection_system::update(jump_system& jump_system) {
             auto& entity2 = *it2;
             auto& transform2 = g_conductor.get_component<transform>(entity2);
             auto& rigidbody2 = g_conductor.get_component<rigidbody>(entity2);
+            auto& entity_state_comp2 = g_conductor.get_component<entity_state>(entity2);
+            if (!entity_state_comp2.is_active || !rigidbody2.can_collide) {
+                continue;
+            }
             
             // Check if entity2 has moved
             float lastX2 = transform2.last_position[0];
@@ -109,66 +127,9 @@ void collision_detection_system::update(jump_system& jump_system) {
                         float massRatio1 = rigidbody2.Mass / totalMass;
                         float massRatio2 = rigidbody1.Mass / totalMass;
                         
-                        if (minOverlapX < minOverlapY) {
-                            // Resolve collision on X axis
-                            // Only move entities that have moved
-                            float separation1 = 0.0f;
-                            float separation2 = 0.0f;
-                            
-                            if (entity1Moved && entity2Moved) {
-                                // Both moved, separate based on their movement direction
-                                float moveRatio1 = moveMag1 / (moveMag1 + moveMag2);
-                                float moveRatio2 = moveMag2 / (moveMag1 + moveMag2);
-                                
-                                if (overlapLeft < overlapRight) {
-                                    // entity1 is on the left, push it left
-                                    separation1 = -minOverlapX * massRatio1 * moveRatio1;
-                                    separation2 = minOverlapX * massRatio2 * moveRatio2;
-                                } else {
-                                    // entity1 is on the right, push it right
-                                    separation1 = minOverlapX * massRatio1 * moveRatio1;
-                                    separation2 = -minOverlapX * massRatio2 * moveRatio2;
-                                }
-                            } else if (entity1Moved) {
-                                // Only entity1 moved, push it back completely
-                                if (overlapLeft < overlapRight) {
-                                    separation1 = -minOverlapX;
-                                    // entity2 stays stationary, no separation
-                                } else {
-                                    separation1 = minOverlapX;
-                                    // entity2 stays stationary, no separation
-                                }
-                            } else if (entity2Moved) {
-                                // Only entity2 moved, push it back completely
-                                if (overlapLeft < overlapRight) {
-                                    // entity1 stays stationary, no separation
-                                    separation2 = minOverlapX;
-                                } else {
-                                    // entity1 stays stationary, no separation
-                                    separation2 = -minOverlapX;
-                                }
-                            }
-                            
-                            // Only apply separation to entities that have moved
-                            if (entity1Moved) {
-                                transform1.position[0] += separation1;
-                                // Update hitbox positions
-                                rigidbody1.Hitbox.setPosition({transform1.position[0], transform1.position[1]});
-                                rigidbody1.Hitbox.setSize({rigidbody1.base_size[0] * transform1.scale[0], rigidbody1.base_size[1] * transform1.scale[1]});
-                                // Stop velocity in the collision direction
-                                rigidbody1.velocity[0] = 0.0f;
-                            }
-                            
-                            if (entity2Moved) {
-                                transform2.position[0] += separation2;
-                                // Update hitbox positions
-                                rigidbody2.Hitbox.setPosition({transform2.position[0], transform2.position[1]});
-                                rigidbody2.Hitbox.setSize({rigidbody2.base_size[0] * transform2.scale[0], rigidbody2.base_size[1] * transform2.scale[1]});
-                                // Stop velocity in the collision direction
-                                rigidbody2.velocity[0] = 0.0f;
-                            }
-                        } else {
-                            // Resolve collision on Y axis
+                        // Prioritize vertical (Y-axis) collisions to prevent side clipping when falling
+                        if (minOverlapY > 0.0f && (minOverlapY <= minOverlapX || minOverlapX <= 0.0f)) {
+                            // Resolve collision on Y axis first
                             // Only move entities that have moved
                             float separation1 = 0.0f;
                             float separation2 = 0.0f;
@@ -243,6 +204,64 @@ void collision_detection_system::update(jump_system& jump_system) {
                                     rigidbody2.velocity[1] = 0.0f;
                                 }
                             }
+                        } else if (minOverlapX > 0.0f) {
+                            // Resolve collision on X axis (only if Y-axis wasn't resolved)
+                            // Only move entities that have moved
+                            float separation1 = 0.0f;
+                            float separation2 = 0.0f;
+                            
+                            if (entity1Moved && entity2Moved) {
+                                // Both moved, separate based on their movement direction
+                                float moveRatio1 = moveMag1 / (moveMag1 + moveMag2);
+                                float moveRatio2 = moveMag2 / (moveMag1 + moveMag2);
+                                
+                                if (overlapLeft < overlapRight) {
+                                    // entity1 is on the left, push it left
+                                    separation1 = -minOverlapX * massRatio1 * moveRatio1;
+                                    separation2 = minOverlapX * massRatio2 * moveRatio2;
+                                } else {
+                                    // entity1 is on the right, push it right
+                                    separation1 = minOverlapX * massRatio1 * moveRatio1;
+                                    separation2 = -minOverlapX * massRatio2 * moveRatio2;
+                                }
+                            } else if (entity1Moved) {
+                                // Only entity1 moved, push it back completely
+                                if (overlapLeft < overlapRight) {
+                                    separation1 = -minOverlapX;
+                                    // entity2 stays stationary, no separation
+                                } else {
+                                    separation1 = minOverlapX;
+                                    // entity2 stays stationary, no separation
+                                }
+                            } else if (entity2Moved) {
+                                // Only entity2 moved, push it back completely
+                                if (overlapLeft < overlapRight) {
+                                    // entity1 stays stationary, no separation
+                                    separation2 = minOverlapX;
+                                } else {
+                                    // entity1 stays stationary, no separation
+                                    separation2 = -minOverlapX;
+                                }
+                            }
+                            
+                            // Only apply separation to entities that have moved
+                            if (entity1Moved) {
+                                transform1.position[0] += separation1;
+                                // Update hitbox positions
+                                rigidbody1.Hitbox.setPosition({transform1.position[0], transform1.position[1]});
+                                rigidbody1.Hitbox.setSize({rigidbody1.base_size[0] * transform1.scale[0], rigidbody1.base_size[1] * transform1.scale[1]});
+                                // Stop velocity in the collision direction
+                                rigidbody1.velocity[0] = 0.0f;
+                            }
+                            
+                            if (entity2Moved) {
+                                transform2.position[0] += separation2;
+                                // Update hitbox positions
+                                rigidbody2.Hitbox.setPosition({transform2.position[0], transform2.position[1]});
+                                rigidbody2.Hitbox.setSize({rigidbody2.base_size[0] * transform2.scale[0], rigidbody2.base_size[1] * transform2.scale[1]});
+                                // Stop velocity in the collision direction
+                                rigidbody2.velocity[0] = 0.0f;
+                            }
                         }
                     }
                 } else {
@@ -275,41 +294,9 @@ void collision_detection_system::update(jump_system& jump_system) {
                             float massRatio1 = rigidbody2.Mass / totalMass;
                             float massRatio2 = rigidbody1.Mass / totalMass;
                             
-                            if (minOverlapX < minOverlapY) {
-                                // Resolve collision on X axis
-                                float separation1 = 0.0f;
-                                float separation2 = 0.0f;
-                                
-                                if (overlapLeft < overlapRight) {
-                                    // entity1 is on the left, push it left
-                                    separation1 = -minOverlapX * massRatio1;
-                                    separation2 = minOverlapX * massRatio2;
-                                } else {
-                                    // entity1 is on the right, push it right
-                                    separation1 = minOverlapX * massRatio1;
-                                    separation2 = -minOverlapX * massRatio2;
-                                }
-                                
-                                // Only apply separation to entities that have moved
-                                if (entity1Moved) {
-                                    transform1.position[0] += separation1;
-                                    // Update hitbox positions and scales to match transforms
-                                    rigidbody1.Hitbox.setPosition({transform1.position[0], transform1.position[1]});
-                                    rigidbody1.Hitbox.setSize({rigidbody1.base_size[0] * transform1.scale[0], rigidbody1.base_size[1] * transform1.scale[1]});
-                                    // Stop velocity in the collision direction
-                                    rigidbody1.velocity[0] = 0.0f;
-                                }
-                                
-                                if (entity2Moved) {
-                                    transform2.position[0] += separation2;
-                                    // Update hitbox positions and scales to match transforms
-                                    rigidbody2.Hitbox.setPosition({transform2.position[0], transform2.position[1]});
-                                    rigidbody2.Hitbox.setSize({rigidbody2.base_size[0] * transform2.scale[0], rigidbody2.base_size[1] * transform2.scale[1]});
-                                    // Stop velocity in the collision direction
-                                    rigidbody2.velocity[0] = 0.0f;
-                                }
-                            } else {
-                                // Resolve collision on Y axis
+                            // Prioritize vertical (Y-axis) collisions to prevent side clipping when falling
+                            if (minOverlapY > 0.0f && (minOverlapY <= minOverlapX || minOverlapX <= 0.0f)) {
+                                // Resolve collision on Y axis first
                                 float separation1 = 0.0f;
                                 float separation2 = 0.0f;
                                 
@@ -358,6 +345,39 @@ void collision_detection_system::update(jump_system& jump_system) {
                                         }
                                         rigidbody2.velocity[1] = 0.0f;
                                     }
+                                }
+                            } else if (minOverlapX > 0.0f) {
+                                // Resolve collision on X axis (only if Y-axis wasn't resolved)
+                                float separation1 = 0.0f;
+                                float separation2 = 0.0f;
+                                
+                                if (overlapLeft < overlapRight) {
+                                    // entity1 is on the left, push it left
+                                    separation1 = -minOverlapX * massRatio1;
+                                    separation2 = minOverlapX * massRatio2;
+                                } else {
+                                    // entity1 is on the right, push it right
+                                    separation1 = minOverlapX * massRatio1;
+                                    separation2 = -minOverlapX * massRatio2;
+                                }
+                                
+                                // Only apply separation to entities that have moved
+                                if (entity1Moved) {
+                                    transform1.position[0] += separation1;
+                                    // Update hitbox positions and scales to match transforms
+                                    rigidbody1.Hitbox.setPosition({transform1.position[0], transform1.position[1]});
+                                    rigidbody1.Hitbox.setSize({rigidbody1.base_size[0] * transform1.scale[0], rigidbody1.base_size[1] * transform1.scale[1]});
+                                    // Stop velocity in the collision direction
+                                    rigidbody1.velocity[0] = 0.0f;
+                                }
+                                
+                                if (entity2Moved) {
+                                    transform2.position[0] += separation2;
+                                    // Update hitbox positions and scales to match transforms
+                                    rigidbody2.Hitbox.setPosition({transform2.position[0], transform2.position[1]});
+                                    rigidbody2.Hitbox.setSize({rigidbody2.base_size[0] * transform2.scale[0], rigidbody2.base_size[1] * transform2.scale[1]});
+                                    // Stop velocity in the collision direction
+                                    rigidbody2.velocity[0] = 0.0f;
                                 }
                             }
                         }
