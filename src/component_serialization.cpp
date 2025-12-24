@@ -55,7 +55,8 @@ void InitializeComponentSerializers() {
         ComponentID::Rigidbody,
         [](const rigidbody &rb) -> std::vector<uint8_t> {
             std::vector<uint8_t> data;
-            data.resize(sizeof(float) * 4 + sizeof(bool));
+            // Serialize: velocity (2 floats) + Mass (1 float) + base_size (2 floats) + can_collide (1 byte)
+            data.resize(sizeof(float) * 5 + 1); // 5 floats + 1 byte for bool
             size_t offset = 0;
             std::memcpy(data.data() + offset, rb.velocity, sizeof(float) * 2);
             offset += sizeof(float) * 2;
@@ -63,12 +64,23 @@ void InitializeComponentSerializers() {
             offset += sizeof(float);
             std::memcpy(data.data() + offset, rb.base_size, sizeof(float) * 2);
             offset += sizeof(float) * 2;
-            std::memcpy(data.data() + offset, &rb.can_collide, sizeof(bool));
+            uint8_t can_collide_byte = rb.can_collide ? 1 : 0;
+            data[offset] = can_collide_byte;
             return data;
         },
         [](const uint8_t *data, size_t size) -> rigidbody {
+            // Initialize with default values to prevent uninitialized memory
             rigidbody rb;
-            if (size >= sizeof(float) * 4 + sizeof(bool)) {
+            rb.velocity[0] = 0.0f;
+            rb.velocity[1] = 0.0f;
+            rb.Mass = 0.0f;
+            rb.base_size[0] = 0.0f;
+            rb.base_size[1] = 0.0f;
+            rb.can_collide = false;
+            rb.Hitbox = sf::RectangleShape({0.0f, 0.0f});
+            
+            // Expect: velocity (2 floats) + Mass (1 float) + base_size (2 floats) + can_collide (1 byte)
+            if (size >= sizeof(float) * 5 + 1) {
                 size_t offset = 0;
                 std::memcpy(rb.velocity, data + offset, sizeof(float) * 2);
                 offset += sizeof(float) * 2;
@@ -76,7 +88,7 @@ void InitializeComponentSerializers() {
                 offset += sizeof(float);
                 std::memcpy(rb.base_size, data + offset, sizeof(float) * 2);
                 offset += sizeof(float) * 2;
-                std::memcpy(&rb.can_collide, data + offset, sizeof(bool));
+                rb.can_collide = (data[offset] != 0);
                 // Hitbox will be reconstructed from base_size
                 rb.Hitbox = sf::RectangleShape({rb.base_size[0], rb.base_size[1]});
             }
@@ -88,28 +100,34 @@ void InitializeComponentSerializers() {
         ComponentID::Item,
         [](const item &itm) -> std::vector<uint8_t> {
             std::vector<uint8_t> data;
-            data.resize(sizeof(bool) * 2 + sizeof(float) * 2);
+            // Serialize bools as uint8_t to ensure consistent size
+            data.resize(2 + sizeof(float) * 2); // 2 bytes for bools, 2 floats
             size_t offset = 0;
-            std::memcpy(data.data() + offset, &itm.is_picked_up, sizeof(bool));
-            offset += sizeof(bool);
+            data[offset++] = itm.is_picked_up ? 1 : 0;
             std::memcpy(data.data() + offset, &itm.time_until_pickup, sizeof(float));
             offset += sizeof(float);
             std::memcpy(data.data() + offset, &itm.time_until_despawn, sizeof(float));
             offset += sizeof(float);
-            std::memcpy(data.data() + offset, &itm.is_coin, sizeof(bool));
+            data[offset] = itm.is_coin ? 1 : 0;
             return data;
         },
         [](const uint8_t *data, size_t size) -> item {
+            // Initialize with default values to prevent uninitialized memory
             item itm;
-            if (size >= sizeof(bool) * 2 + sizeof(float) * 2) {
+            itm.is_picked_up = false;
+            itm.time_until_pickup = 0.0f;
+            itm.time_until_despawn = 0.0f;
+            itm.is_coin = false;
+            
+            // Expect 2 bytes for bools, 2 floats
+            if (size >= 2 + sizeof(float) * 2) {
                 size_t offset = 0;
-                std::memcpy(&itm.is_picked_up, data + offset, sizeof(bool));
-                offset += sizeof(bool);
+                itm.is_picked_up = (data[offset++] != 0);
                 std::memcpy(&itm.time_until_pickup, data + offset, sizeof(float));
                 offset += sizeof(float);
                 std::memcpy(&itm.time_until_despawn, data + offset, sizeof(float));
                 offset += sizeof(float);
-                std::memcpy(&itm.is_coin, data + offset, sizeof(bool));
+                itm.is_coin = (data[offset] != 0);
                 // ui_view will need to be set separately
             }
             return itm;
@@ -131,7 +149,13 @@ void InitializeComponentSerializers() {
             return data;
         },
         [](const uint8_t *data, size_t size) -> inventory {
+            // Initialize with default values to prevent uninitialized memory
             inventory inv;
+            inv.coins = 0;
+            inv.selected_slot = 0;
+            inv.max_items = 0;
+            // items vector is empty by default
+            
             if (size >= sizeof(int) * 3) {
                 size_t offset = 0;
                 std::memcpy(&inv.coins, data + offset, sizeof(int));

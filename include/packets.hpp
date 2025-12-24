@@ -83,8 +83,10 @@ struct EntityInitPacketHeader {
   PacketHeader header;
   uint32_t network_id;
   uint32_t component_count;
-  // Followed by serialized components:
-  // For each component: [component_id (uint8_t)][size (uint16_t)][data]
+  uint8_t networked_component_count;  // Number of components to sync
+  // Followed by:
+  // 1. networked_component_count * [component_id (uint8_t)]  - List of components to sync
+  // 2. component_count * [component_id (uint8_t)][size (uint16_t)][data]  - Serialized components
 };
 
 // Component Batch Update Packet

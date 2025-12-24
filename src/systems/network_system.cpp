@@ -121,7 +121,6 @@ void network_system::request_network_id() {
     packet.header.sequence_number = 0;
 
     NetworkManager::Get().SendPacketToServer(&packet, sizeof(packet));
-    std::cout << "Requested network ID from host" << std::endl;
 }
 
 entity network_system::create_networked_entity(uint32_t netId, bool is_local) {
@@ -150,6 +149,12 @@ void network_system::send_entity_init(entity ent) {
     header->header.sequence_number = 0;
     header->network_id = net.id;
     header->component_count = 0;
+    header->networked_component_count = static_cast<uint8_t>(net.networked_components.size());
+
+    // Append the list of networked component IDs
+    for (ComponentID comp_id : net.networked_components) {
+        buffer.push_back(static_cast<uint8_t>(comp_id));
+    }
 
     auto &serializer = ComponentSerializer::Get();
 
@@ -245,13 +250,9 @@ void network_system::send_entity_init(entity ent) {
         NetworkManager::Get().SendPacketToServer(buffer.data(), buffer.size());
     }
 
-    std::cout << "Sent entity init for network ID " << net.id << " with "
-              << component_count << " components" << std::endl;
 }
 
 void network_system::send_all_entities_to_client(HSteamNetConnection conn) {
-    std::cout << "Sending all existing entities to new client..." << std::endl;
-
     for (auto const &ent : entities) {
         auto &net = g_conductor.get_component<network>(ent);
         if (!net.is_local)
@@ -267,6 +268,12 @@ void network_system::send_all_entities_to_client(HSteamNetConnection conn) {
         header->header.sequence_number = 0;
         header->network_id = net.id;
         header->component_count = 0;
+        header->networked_component_count = static_cast<uint8_t>(net.networked_components.size());
+
+        // Append the list of networked component IDs
+        for (ComponentID comp_id : net.networked_components) {
+            buffer.push_back(static_cast<uint8_t>(comp_id));
+        }
 
         auto &serializer = ComponentSerializer::Get();
 
@@ -338,9 +345,6 @@ void network_system::send_all_entities_to_client(HSteamNetConnection conn) {
 
         // Send to specific client
         NetworkManager::Get().SendToConnection(conn, buffer.data(), buffer.size());
-
-        std::cout << "  - Sent entity " << net.id << " with "
-                  << component_count << " components" << std::endl;
     }
 
     std::cout << "Finished sending all entities to new client" << std::endl;
@@ -361,8 +365,6 @@ void network_system::transfer_ownership(entity ent, uint32_t newOwnerPlayerId) {
         NetworkManager::Get().SendPacketToServer(&packet, sizeof(packet));
     }
 
-    std::cout << "Requested ownership transfer for network ID " << net.id
-              << " to player " << newOwnerPlayerId << std::endl;
 }
 
 // Packet Handlers
@@ -376,8 +378,6 @@ void network_system::handle_reserve_id_request(HSteamNetConnection conn,
 
     // Allocate a new network ID
     uint32_t newId = NetworkManager::Get().AllocateNetworkId();
-
-    std::cout << "Host allocated network ID: " << newId << std::endl;
 
     // Broadcast to all clients that this ID is reserved
     NetworkIDReservedPacket reservedPacket;
@@ -395,8 +395,6 @@ void network_system::handle_reserve_id_request(HSteamNetConnection conn,
     NetworkManager::Get().SendToConnection(conn, &grantedPacket,
                                            sizeof(grantedPacket));
 
-    std::cout << "Granted network ID " << newId << " to client" << std::endl;
-
     // Send all existing entities to the new client
     send_all_entities_to_client(conn);
 }
@@ -409,8 +407,6 @@ void network_system::handle_network_id_reserved(const void *data, size_t size) {
         static_cast<const NetworkIDReservedPacket *>(data);
 
     m_reservedIds.push_back(packet->reserved_id);
-    std::cout << "Network ID " << packet->reserved_id << " is now reserved"
-              << std::endl;
 }
 
 void network_system::handle_network_id_granted(const void *data, size_t size) {
@@ -421,8 +417,6 @@ void network_system::handle_network_id_granted(const void *data, size_t size) {
         static_cast<const NetworkIDGrantedPacket *>(data);
 
     m_pendingGrantedId = packet->granted_id;
-    std::cout << "Received granted network ID: " << packet->granted_id
-              << std::endl;
 }
 
 void network_system::handle_entity_init(const void *data, size_t size) {
@@ -432,15 +426,9 @@ void network_system::handle_entity_init(const void *data, size_t size) {
     const EntityInitPacketHeader *header =
         static_cast<const EntityInitPacketHeader *>(data);
 
-    std::cout << "Received entity init for network ID " << header->network_id
-              << " with " << header->component_count << " components"
-              << std::endl;
-
     // Check if entity already exists (prevent duplicates)
     entity existing_ent = NetworkManager::Get().GetEntityByNetworkId(header->network_id);
     if (existing_ent != 0) {
-        std::cout << "Entity with network ID " << header->network_id
-                  << " already exists, skipping creation" << std::endl;
         return;
     }
 
@@ -448,9 +436,20 @@ void network_system::handle_entity_init(const void *data, size_t size) {
     // The entity is remote (not local) since we're receiving it
     entity ent = create_networked_entity(header->network_id, false);
 
-    // Deserialize components
+    // Read the networked components list
     const uint8_t *ptr =
         static_cast<const uint8_t *>(data) + sizeof(EntityInitPacketHeader);
+
+    auto &net_comp = g_conductor.get_component<network>(ent);
+    net_comp.networked_components.clear();
+    for (uint8_t i = 0; i < header->networked_component_count; ++i) {
+        if (ptr >= static_cast<const uint8_t *>(data) + size)
+            break;
+        ComponentID comp_id = static_cast<ComponentID>(*ptr++);
+        net_comp.networked_components.push_back(comp_id);
+    }
+
+    // Deserialize components
     auto &serializer = ComponentSerializer::Get();
 
     for (uint32_t i = 0; i < header->component_count; ++i) {
@@ -532,13 +531,17 @@ void network_system::handle_entity_init(const void *data, size_t size) {
         ptr += comp_size;
     }
 
+    // Ensure entity_state component exists (required for most systems)
+    if (!g_conductor.has_component<entity_state>(ent)) {
+        g_conductor.add_component<entity_state>(ent, entity_state{true, false});
+    }
+
+    std::cout << "Created networked entity with ID " << header->network_id << std::endl;
+
     // If we're the host, forward this to other clients
     if (NetworkManager::Get().IsHost()) {
         NetworkManager::Get().BroadcastPacket(data, size);
     }
-
-    std::cout << "Created networked entity with ID " << header->network_id
-              << std::endl;
 }
 
 void network_system::handle_ownership_transfer(const void *data, size_t size) {
@@ -558,13 +561,8 @@ void network_system::handle_ownership_transfer(const void *data, size_t size) {
     if (packet->new_owner_player_id ==
         NetworkManager::Get().GetLocalPlayerId()) {
         net.is_local = true;
-        std::cout << "Received ownership of entity " << packet->network_id
-                  << std::endl;
     } else {
         net.is_local = false;
-        std::cout << "Entity " << packet->network_id
-                  << " transferred to player " << packet->new_owner_player_id
-                  << std::endl;
     }
 
     // If we're the host, broadcast this to all clients

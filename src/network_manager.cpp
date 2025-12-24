@@ -246,6 +246,16 @@ void NetworkManager::RegisterNetworkEntity(uint32_t netId, entity ent) {
     m_networkIdToEntity[netId] = ent;
 }
 
+void NetworkManager::UnregisterNetworkEntity(entity ent) {
+    // Find and remove the network ID mapping for this entity
+    for (auto it = m_networkIdToEntity.begin(); it != m_networkIdToEntity.end(); ++it) {
+        if (it->second == ent) {
+            m_networkIdToEntity.erase(it);
+            return;
+        }
+    }
+}
+
 entity NetworkManager::GetEntityByNetworkId(uint32_t netId) const {
     auto it = m_networkIdToEntity.find(netId);
     if (it != m_networkIdToEntity.end()) {

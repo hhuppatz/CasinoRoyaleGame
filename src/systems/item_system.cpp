@@ -5,6 +5,7 @@
 #include "help_functions.hpp"
 #include <SFML/Graphics/Rect.hpp>
 #include "components/entity_state.hpp"
+#include <iostream>
 
 void item_system::update(float dt) {
     for (auto entity : entities) {
@@ -36,6 +37,19 @@ bool item_system::can_be_picked_up(entity item_entity) {
 // Returns first item entity that intersects with given hitbox only
 entity item_system::check_collision(sf::FloatRect hitbox) {
     for (auto entity : entities) {
+        // Safety check: verify entity has all required components
+        if (!g_conductor.has_component<transform>(entity) ||
+            !g_conductor.has_component<rigidbody>(entity) ||
+            !g_conductor.has_component<entity_state>(entity) ||
+            !g_conductor.has_component<item>(entity)) {
+            std::cerr << "ERROR: Entity " << entity << " in item_system but missing required components!" << std::endl;
+            std::cerr << "  Has transform: " << g_conductor.has_component<transform>(entity) << std::endl;
+            std::cerr << "  Has rigidbody: " << g_conductor.has_component<rigidbody>(entity) << std::endl;
+            std::cerr << "  Has entity_state: " << g_conductor.has_component<entity_state>(entity) << std::endl;
+            std::cerr << "  Has item: " << g_conductor.has_component<item>(entity) << std::endl;
+            continue;
+        }
+        
         auto& transform_comp = g_conductor.get_component<transform>(entity);
         auto& rigidbody_comp = g_conductor.get_component<rigidbody>(entity);
         auto& entity_state_comp = g_conductor.get_component<entity_state>(entity);

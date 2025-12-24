@@ -38,6 +38,7 @@ public:
   // Network ID management
   uint32_t AllocateNetworkId(); // Host only
   void RegisterNetworkEntity(uint32_t netId, entity ent);
+  void UnregisterNetworkEntity(entity ent); // NEW: Unregister entity when destroyed
   entity GetEntityByNetworkId(uint32_t netId) const;
   HSteamNetConnection GetConnectionByNetworkId(uint32_t netId) const;
   void SendToConnection(HSteamNetConnection conn, const void *data, size_t size,

@@ -16,6 +16,11 @@ void conductor::init() {
 entity conductor::create_entity() { return m_entity_manager->create_entity(); }
 
 void conductor::destroy_entity(entity entity) {
+    // If this is a networked entity, unregister it from NetworkManager
+    if (has_component<network>(entity)) {
+        NetworkManager::Get().UnregisterNetworkEntity(entity);
+    }
+    
     m_entity_manager->destroy_entity(entity);
     m_component_manager->entity_destroyed(entity);
     m_system_manager->entity_destroyed(entity);

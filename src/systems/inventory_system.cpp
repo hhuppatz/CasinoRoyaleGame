@@ -6,6 +6,7 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include "components/entity_state.hpp"
 #include "components/item.hpp"
 
@@ -21,6 +22,12 @@ void inventory_system::attempt_pickups(item_system& item_sys) {
         if (collision < MAX_ENTITIES) { // Valid item entity found
             // Check if the item can actually be picked up
             if (!item_sys.can_be_picked_up(collision)) {
+                continue;
+            }
+            
+            // Safety check: verify the entity has an item component before accessing it
+            if (!g_conductor.has_component<item>(collision)) {
+                std::cerr << "WARNING: Entity " << collision << " found by collision detection but has no item component!" << std::endl;
                 continue;
             }
             
